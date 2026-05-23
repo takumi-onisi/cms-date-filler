@@ -27,17 +27,27 @@ chrome.storage.local.get([STORAGE_KEY], (result) => {
       label.classList.add("done");
     }
 
-    const button = document.createElement("button");
-    button.textContent = "入力";
-    button.addEventListener("click", () => {
-      // アクティブタブにスクリプトを実行
+    // 入力ボタン
+    const inputBtn = document.createElement("button");
+    inputBtn.textContent = "入力";
+    inputBtn.addEventListener("click", () => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const tabId = tabs[0].id;
-
         chrome.scripting.executeScript({
-          target: { tabId: tabId },
+          target: { tabId: tabs[0].id },
           func: fillDateInputs,
           args: [period],
+        });
+      });
+    });
+
+    // 検索ボタン
+    const searchBtn = document.createElement("button");
+    searchBtn.textContent = "検索";
+    searchBtn.addEventListener("click", () => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id },
+          func: clickSearchButton,
         });
       });
 
@@ -48,13 +58,24 @@ chrome.storage.local.get([STORAGE_KEY], (result) => {
         const done = res[STORAGE_KEY] || [];
         if (!done.includes(index)) {
           done.push(index);
-          chrome.storage.local.set({ [STORAGE_KEY]: done });
+          chrome.storage.local.set({ [STORAGE_KEY]: done }, () => {
+            // すべての期間が完了していたらリセット
+            if (done.length === PERIODS.length) {
+              chrome.storage.local.set({ [STORAGE_KEY]: [] }, () => {
+                // UIのdoneマークもリセット
+                document
+                  .querySelectorAll(".period span")
+                  .forEach((s) => s.classList.remove("done"));
+              });
+            }
+          });
         }
       });
     });
 
     div.appendChild(label);
-    div.appendChild(button);
+    div.appendChild(inputBtn);
+    div.appendChild(searchBtn);
     periodsContainer.appendChild(div);
   });
 });
@@ -101,5 +122,16 @@ function fillDateInputs(period) {
     });
   } else {
     alert("CMSの日付入力欄が見つかりません。セレクタを確認してください。");
+  }
+}
+
+// ページ側で実行される関数: 検索ボタンクリック
+function clickSearchButton() {
+  // CMSの検索ボタンセレクタを適宜修正してください
+  const searchBtn = document.querySelector("#search_btn");
+  if (searchBtn) {
+    searchBtn.click();
+  } else {
+    alert("検索ボタンが見つかりません。セレクタを確認してください。");
   }
 }
