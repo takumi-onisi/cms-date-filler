@@ -13,7 +13,9 @@ const STORAGE_KEY = "completedPeriods";
 // ページにパネルを生成
 const periodsContainer = document.getElementById("periods");
 
-// 保存されている完了データを取得
+// 現在押されている入力ボタン
+let activeInputIndex = null;
+
 chrome.storage.local.get([STORAGE_KEY], (result) => {
   const completed = result[STORAGE_KEY] || [];
 
@@ -23,14 +25,37 @@ chrome.storage.local.get([STORAGE_KEY], (result) => {
 
     const label = document.createElement("span");
     label.textContent = `${period[0]} ~ ${period[1]}`;
+
     if (completed.includes(index)) {
       label.classList.add("done");
     }
 
+    // =========================
     // 入力ボタン
+    // =========================
+
     const inputBtn = document.createElement("button");
     inputBtn.textContent = "入力";
+
     inputBtn.addEventListener("click", () => {
+      // 以前の押下状態解除
+      document
+        .querySelectorAll(".input-active")
+        .forEach((btn) => btn.classList.remove("input-active"));
+
+      // 現在を押下状態へ
+      inputBtn.classList.add("input-active");
+
+      activeInputIndex = index;
+
+      // 対応する検索ボタンだけ有効化
+      document
+        .querySelectorAll(".search-btn")
+        .forEach((btn) => (btn.disabled = true));
+
+      searchBtn.disabled = false;
+
+      // CMSへ日付入力
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         chrome.scripting.executeScript({
           target: { tabId: tabs[0].id },
@@ -40,10 +65,25 @@ chrome.storage.local.get([STORAGE_KEY], (result) => {
       });
     });
 
+    // =========================
     // 検索ボタン
+    // =========================
+
     const searchBtn = document.createElement("button");
+
     searchBtn.textContent = "検索";
+
+    searchBtn.classList.add("search-btn");
+
+    // 初期状態は押せない
+    searchBtn.disabled = true;
+
     searchBtn.addEventListener("click", () => {
+      // 対応入力ボタン押下中のみ許可
+      if (activeInputIndex !== index) {
+        return;
+      }
+
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         chrome.scripting.executeScript({
           target: { tabId: tabs[0].id },
@@ -53,22 +93,56 @@ chrome.storage.local.get([STORAGE_KEY], (result) => {
 
       // 完了マークを付ける
       label.classList.add("done");
-      // 保存する
+
+      // 入力ボタン押下状態解除
+      inputBtn.classList.remove("input-active");
+
+      activeInputIndex = null;
+
+      // 検索ボタン無効化
+      searchBtn.disabled = true;
+
+      // 保存
       chrome.storage.local.get([STORAGE_KEY], (res) => {
-        const done = res[STORAGE_KEY] || [];
+        let done = res[STORAGE_KEY] || [];
+
         if (!done.includes(index)) {
           done.push(index);
-          chrome.storage.local.set({ [STORAGE_KEY]: done }, () => {
-            // すべての期間が完了していたらリセット
-            if (done.length === PERIODS.length) {
-              chrome.storage.local.set({ [STORAGE_KEY]: [] }, () => {
-                // UIのdoneマークもリセット
-                document
-                  .querySelectorAll(".period span")
-                  .forEach((s) => s.classList.remove("done"));
-              });
-            }
-          });
+        }
+
+        chrome.storage.local.set({
+          [STORAGE_KEY]: done,
+        });
+
+        // =========================
+        // 全完了判定
+        // =========================
+
+        if (done.length === PERIODS.length) {
+          // 少し遅延してリセット
+          setTimeout(() => {
+            // done解除
+            document
+              .querySelectorAll(".period span")
+              .forEach((s) => s.classList.remove("done"));
+
+            // 入力ボタン状態解除
+            document
+              .querySelectorAll(".input-active")
+              .forEach((btn) => btn.classList.remove("input-active"));
+
+            // 検索ボタン無効化解除
+            document
+              .querySelectorAll(".search-btn")
+              .forEach((btn) => (btn.disabled = true));
+
+            // storage初期化
+            chrome.storage.local.set({
+              [STORAGE_KEY]: [],
+            });
+
+            activeInputIndex = null;
+          }, 300);
         }
       });
     });
@@ -76,13 +150,18 @@ chrome.storage.local.get([STORAGE_KEY], (result) => {
     div.appendChild(label);
     div.appendChild(inputBtn);
     div.appendChild(searchBtn);
+
     periodsContainer.appendChild(div);
   });
 });
 
-// ページ側で実行される関数
+// ====================================
+// CMSへ日付入力
+// ====================================
+
 function fillDateInputs(period) {
   const [start, end] = period;
+
   const [startY, startM, startD] = start.split("-"); // 年月日
   const [endY, endM, endD] = end.split("-");
 
@@ -90,6 +169,7 @@ function fillDateInputs(period) {
   const startYearInput = document.querySelector("#start_year");
   const startMonthInput = document.querySelector("#start_month");
   const startDayInput = document.querySelector("#start_day");
+
   const endYearInput = document.querySelector("#end_year");
   const endMonthInput = document.querySelector("#end_month");
   const endDayInput = document.querySelector("#end_day");
@@ -105,11 +185,12 @@ function fillDateInputs(period) {
     startYearInput.value = startY;
     startMonthInput.value = startM;
     startDayInput.value = startD;
+
     endYearInput.value = endY;
     endMonthInput.value = endM;
     endDayInput.value = endD;
 
-    // React/Vue対応: input イベントを発火させる
+    // CMSのinput要素に合わせてセレクタを変更してください
     [
       startYearInput,
       startMonthInput,
@@ -120,15 +201,17 @@ function fillDateInputs(period) {
     ].forEach((input) => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-  } else {
-    alert("CMSの日付入力欄が見つかりません。セレクタを確認してください。");
   }
 }
 
-// ページ側で実行される関数: 検索ボタンクリック
+// ====================================
+// CMS検索ボタン
+// ====================================
+
 function clickSearchButton() {
   // CMSの検索ボタンセレクタを適宜修正してください
   const searchBtn = document.querySelector("#search_btn");
+
   if (searchBtn) {
     searchBtn.click();
   } else {
