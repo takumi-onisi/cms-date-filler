@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CMSテストページ</title>
+
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 30px;
+      }
+
+      h1 {
+        margin-bottom: 20px;
+      }
+
+      .date-row {
+        margin-bottom: 15px;
+      }
+
+      input {
+        width: 60px;
+        padding: 5px;
+        margin-right: 5px;
+      }
+
+      button {
+        padding: 8px 16px;
+        cursor: pointer;
+      }
+
+      .log {
+        margin-top: 30px;
+        padding: 15px;
+        border: 1px solid #ccc;
+        background: #f5f5f5;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CSV検索テストページ</h1>
+
+    <!-- 開始日 -->
+
+    <div class="date-row">
+      <strong>開始日:</strong>
+
+      <input id="start_year" placeholder="年" />
+      <input id="start_month" placeholder="月" />
+      <input id="start_day" placeholder="日" />
+    </div>
+
+    <!-- 終了日 -->
+
+    <div class="date-row">
+      <strong>終了日:</strong>
+
+      <input id="end_year" placeholder="年" />
+      <input id="end_month" placeholder="月" />
+      <input id="end_day" placeholder="日" />
+    </div>
+
+    <!-- 検索ボタン -->
+
+    <button id="search_btn">検索</button>
+
+    <!-- ログ -->
+
+    <div class="log" id="log">まだ検索されていません</div>
+
+    <script>
+      // ==========================================
+      // inputイベント確認用
+      // ==========================================
+
+      document.querySelectorAll("input").forEach((input) => {
+        input.addEventListener("input", () => {
+          console.log(`${input.id} changed: ${input.value}`);
+        });
+      });
+
+      // ==========================================
+      // 検索ボタン
+      // ==========================================
+
+      document.getElementById("search_btn").addEventListener("click", () => {
+        const data = {
+          start: {
+            year: document.getElementById("start_year").value,
+            month: document.getElementById("start_month").value,
+            day: document.getElementById("start_day").value,
+          },
+
+          end: {
+            year: document.getElementById("end_year").value,
+            month: document.getElementById("end_month").value,
+            day: document.getElementById("end_day").value,
+          },
+        };
+
+        console.log("検索実行", data);
+
+        // ログ表示
+
+        document.getElementById("log").innerHTML = `
+          <strong>検索実行:</strong><br><br>
+
+          開始日:
+          ${data.start.year}/
+          ${data.start.month}/
+          ${data.start.day}
+          <br><br>
+
+          終了日:
+          ${data.end.year}/
+          ${data.end.month}/
+          ${data.end.day}
+        `;
+
+        // 疑似リロード
+
+        setTimeout(() => {
+          location.reload();
+        }, 1000);
+      });
+    </script>
+  </body>
+</html>
